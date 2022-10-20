@@ -28,7 +28,6 @@ framework module Realm {
         header "RLMSwiftValueStorage.h"
         header "RLMSyncConfiguration_Private.h"
         header "RLMSyncSubscription_Private.h"
-        header "RLMSyncUtil_Private.h"
         header "RLMUser_Private.h"
     }
 

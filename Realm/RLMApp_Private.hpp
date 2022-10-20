@@ -46,6 +46,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-NSError * RLMAppErrorToNSError(realm::app::AppError const& appError);
+NSError * makeError(realm::app::AppError const& appError);
 
 NS_ASSUME_NONNULL_END

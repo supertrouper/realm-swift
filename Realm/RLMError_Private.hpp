@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2022 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,30 +16,29 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import "RLMSyncConfiguration_Private.h"
+#import <Realm/RLMError.h>
 
-#import <memory>
+#import <realm/exceptions.hpp>
+#import <realm/status_with.hpp>
+
+#pragma clang visibility push(hidden)
 
 namespace realm {
-class SyncSession;
-struct SyncConfig;
 struct SyncError;
-using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, SyncError);
 }
 
-NS_ASSUME_NONNULL_BEGIN
+NSError *makeError(realm::Status const& status);
 
-@interface RLMSyncConfiguration ()
+template <typename T>
+NSError *makeError(realm::StatusWith<T> const& statusWith) {
+    return makeError(statusWith.get_status());
+}
 
-- (instancetype)initWithRawConfig:(realm::SyncConfig)config path:(std::string const&)path;
-- (realm::SyncConfig&)rawConfiguration;
+NSError *makeError(realm::Exception const& exception);
+NSError *makeError(realm::FileAccessError const& exception);
+NSError *makeError(std::exception const& exception);
+NSError *makeError(std::system_error const& exception);
+NSError *makeError(realm::SyncError&& error);
+NSError *makeError(realm::SyncError const& error) = delete;
 
-// Pass the RLMRealmConfiguration to it's sync configuration so client reset callbacks
-// can access schema, dynamic, and path properties.
-void RLMSetConfigInfoForClientResetCallbacks(realm::SyncConfig& syncConfig, RLMRealmConfiguration *config);
-
-@property (nonatomic) std::string path;
-
-@end
-
-NS_ASSUME_NONNULL_END
+#pragma clang visibility pop

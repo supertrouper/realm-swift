@@ -3735,11 +3735,11 @@ upgraded Realms.
 ### Fixed
 
 * Fix the spelling of `ObjectKeyIdentifiable`. The old spelling is available
-  and deprecated for compatiblity.
+  and deprecated for compatibility.
 * Rename `RealmCollection.publisher` to `RealmCollection.collectionPublisher`.
   The old name interacted with the `publisher` defined by `Sequence` in very
   confusing ways, so we need to use a different name. The `publisher` name is
-  still available for compatiblity. ([#6516](https://github.com/realm/realm-swift/issues/6516))
+  still available for compatibility. ([#6516](https://github.com/realm/realm-swift/issues/6516))
 * Work around "xcodebuild timed out while trying to read
   SwiftPackageManagerExample.xcodeproj" errors when installing Realm via
   Carthage. ([#6549](https://github.com/realm/realm-swift/issues/6549)).
@@ -7832,7 +7832,7 @@ Prebuilt frameworks are now built with Xcode 7.1.
 
 ### Enhancements
 
-* Improve compatiblity of encrypted Realms with third-party crash reporters.
+* Improve compatibility of encrypted Realms with third-party crash reporters.
 
 ### Bugfixes
 

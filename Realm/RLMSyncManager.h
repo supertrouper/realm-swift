@@ -18,7 +18,7 @@
 
 #import <Foundation/Foundation.h>
 
-#import <Realm/RLMSyncUtil.h>
+#import <Realm/RLMConstants.h>
 
 @class RLMSyncSession, RLMSyncTimeoutOptions, RLMAppConfiguration;
 

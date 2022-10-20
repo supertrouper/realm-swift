@@ -20,6 +20,7 @@
 
 #import "RLMApp_Private.hpp"
 #import "RLMBSON_Private.hpp"
+#import "RLMError_Private.hpp"
 #import "RLMFindOneAndModifyOptions_Private.hpp"
 #import "RLMFindOptions_Private.hpp"
 #import "RLMNetworkTransport_Private.hpp"
@@ -79,7 +80,7 @@
     }
 
     if (_watchStream.state() == realm::app::WatchStream::State::HAVE_ERROR) {
-        [self didReceiveError:RLMAppErrorToNSError(_watchStream.error())];
+        [self didReceiveError:makeError(_watchStream.error())];
     }
 }
 
@@ -131,7 +132,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                          [completion](std::optional<realm::bson::BsonArray> documents,
                                       std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         completion((NSArray<NSDictionary<NSString *, id<RLMBSON>> *> *)RLMConvertBsonToRLMBSON(*documents), nil);
     });
@@ -149,7 +150,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                              [completion](std::optional<realm::bson::BsonDocument> document,
                                           std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         if (document) {
             completion((NSDictionary<NSString *, id<RLMBSON>> *)RLMConvertBsonToRLMBSON(*document), nil);
@@ -170,7 +171,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                [completion](std::optional<realm::bson::Bson> objectId,
                                             std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         completion(RLMConvertBsonToRLMBSON(*objectId), nil);
     });
@@ -182,7 +183,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                 [completion](std::vector<realm::bson::Bson> insertedIds,
                                              std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         NSMutableArray *insertedArr = [[NSMutableArray alloc] initWithCapacity:insertedIds.size()];
         for (auto& objectId : insertedIds) {
@@ -198,7 +199,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                               [completion](std::optional<realm::bson::BsonArray> documents,
                                            std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         completion((NSArray<id> *)RLMConvertBsonToRLMBSON(*documents), nil);
     });
@@ -211,7 +212,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                           [completion](uint64_t count,
                                        std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(0, RLMAppErrorToNSError(*error));
+            return completion(0, makeError(*error));
         }
         completion(static_cast<NSInteger>(count), nil);
     });
@@ -228,7 +229,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                [completion](uint64_t count,
                                             std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(0, RLMAppErrorToNSError(*error));
+            return completion(0, makeError(*error));
         }
         completion(static_cast<NSInteger>(count), nil);
     });
@@ -240,7 +241,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                 [completion](uint64_t count,
                                              std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(0, RLMAppErrorToNSError(*error));
+            return completion(0, makeError(*error));
         }
         completion(static_cast<NSInteger>(count), nil);
     });
@@ -255,7 +256,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                [completion](realm::app::MongoCollection::UpdateResult result,
                                             std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         completion([[RLMUpdateResult alloc] initWithUpdateResult:result], nil);
     });
@@ -279,7 +280,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                 [completion](realm::app::MongoCollection::UpdateResult result,
                                              std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
         completion([[RLMUpdateResult alloc] initWithUpdateResult:result], nil);
     });
@@ -303,7 +304,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                         [completion](std::optional<realm::bson::BsonDocument> document,
                                                      std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
 
         return completion((NSDictionary *)RLMConvertBsonDocumentToRLMBSON(document), nil);
@@ -328,7 +329,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                          [completion](std::optional<realm::bson::BsonDocument> document,
                                                       std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
 
         return completion((NSDictionary *)RLMConvertBsonDocumentToRLMBSON(document), nil);
@@ -352,7 +353,7 @@ static realm::bson::BsonArray toBsonArray(id<RLMBSON> bson) {
                                         [completion](std::optional<realm::bson::BsonDocument> document,
                                                      std::optional<realm::app::AppError> error) {
         if (error) {
-            return completion(nil, RLMAppErrorToNSError(*error));
+            return completion(nil, makeError(*error));
         }
 
         return completion((NSDictionary *)RLMConvertBsonDocumentToRLMBSON(document), nil);
