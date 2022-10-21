@@ -1192,8 +1192,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
     func testStreamingDownloadNotifier() throws {
         let user = try logInUser(for: basicCredentials())
         if !isParent {
-            populateRealm(user: user, partitionValue: #function)
-            return
+            return try populateRealm(user: user, partitionValue: #function)
         }
 
         var callCount = 0
@@ -1206,29 +1205,40 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
             return
 
         }
-        let ex = expectation(description: "streaming-downloads-expectation")
         var hasBeenFulfilled = false
 
+        var ex = expectation(description: "download one")
         let token = session.addProgressNotification(for: .download, mode: .reportIndefinitely) { p in
-            callCount += 1
-            XCTAssertGreaterThanOrEqual(p.transferredBytes, transferred)
-            XCTAssertGreaterThanOrEqual(p.transferrableBytes, transferrable)
-            transferred = p.transferredBytes
-            transferrable = p.transferrableBytes
-            if p.transferredBytes > 0 && p.isTransferComplete && !hasBeenFulfilled {
-                ex.fulfill()
-                hasBeenFulfilled = true
+            DispatchQueue.main.async {
+                callCount += 1
+                XCTAssertGreaterThanOrEqual(p.transferredBytes, transferred)
+                XCTAssertGreaterThanOrEqual(p.transferrableBytes, transferrable)
+                transferred = p.transferredBytes
+                transferrable = p.transferrableBytes
+                if p.transferredBytes > 0 && p.isTransferComplete && !hasBeenFulfilled {
+                    ex.fulfill()
+                    hasBeenFulfilled = true
+                }
             }
         }
         XCTAssertNotNil(token)
 
         // Wait for the child process to upload all the data.
         executeChild()
-
         waitForExpectations(timeout: 60.0, handler: nil)
+        XCTAssertGreaterThanOrEqual(callCount, 1)
+        XCTAssertGreaterThanOrEqual(transferred, transferrable)
+        let initialCallCount = callCount
+
+        // Run a second time to upload more data and verify that the callback continues to be called
+        hasBeenFulfilled = false
+        ex = expectation(description: "download two")
+        executeChild()
+        waitForExpectations(timeout: 60.0, handler: nil)
+        XCTAssertGreaterThanOrEqual(callCount, initialCallCount)
+        XCTAssertGreaterThanOrEqual(transferred, transferrable)
+
         token!.invalidate()
-        XCTAssert(callCount > 1)
-        XCTAssert(transferred >= transferrable)
     }
 
     func testStreamingUploadNotifier() throws {
@@ -1323,8 +1333,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
     func testDownloadRealm() throws {
         let user = try logInUser(for: basicCredentials())
         if !isParent {
-            populateRealm(user: user, partitionValue: #function)
-            return
+            return try populateRealm(user: user, partitionValue: #function)
         }
 
         // Wait for the child process to upload everything.
@@ -1358,8 +1367,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
     func testDownloadRealmToCustomPath() throws {
         let user = try logInUser(for: basicCredentials())
         if !isParent {
-            populateRealm(user: user, partitionValue: #function)
-            return
+            return try populateRealm(user: user, partitionValue: #function)
         }
 
         // Wait for the child process to upload everything.
@@ -1396,8 +1404,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
     func testCancelDownloadRealm() throws {
         let user = try logInUser(for: basicCredentials())
         if !isParent {
-            populateRealm(user: user, partitionValue: #function)
-            return
+            return try populateRealm(user: user, partitionValue: #function)
         }
 
         // Wait for the child process to upload everything.
@@ -1426,8 +1433,7 @@ class SwiftObjectServerTests: SwiftSyncTestCase {
     func testAsyncOpenProgress() throws {
         let user = try logInUser(for: basicCredentials())
         if !isParent {
-            populateRealm(user: user, partitionValue: #function)
-            return
+            return try populateRealm(user: user, partitionValue: #function)
         }
 
         // Wait for the child process to upload everything.
