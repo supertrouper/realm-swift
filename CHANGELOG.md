@@ -37,6 +37,7 @@ x.y.z Release notes (yyyy-MM-dd)
 
 ### Internal
 * Upgraded realm-core from 12.11.0 to 12.12.0
+* Migrated our CI to Xcode Cloud.
 
 10.32.3 Release notes (2022-11-10)
 =============================================================
@@ -58,6 +59,7 @@ x.y.z Release notes (yyyy-MM-dd)
 * Carthage release for Swift is built with Xcode 14.1.
 * CocoaPods: 1.10 or later.
 * Xcode: 13.1-14.1.
+* Upgraded realm-core from ? to ?
 
 10.32.2 Release notes (2022-11-01)
 =============================================================
@@ -91,6 +93,7 @@ Switch to building the Carthage release with Xcode 14.1.
 * Some sync errors sent by the server include a link to the server-side logs
   associated with that error. This link is now exposed in the `serverLogURL`
   property on `SyncError` (or `RLMServerLogURLKey` userInfo field when using NSError).
+* Migrate all our CI jobs to Xcode cloud.
 
 ### Fixed
 

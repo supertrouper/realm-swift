@@ -4,7 +4,7 @@
    version = "1.3">
    <BuildAction
       parallelizeBuildables = "YES"
-      buildImplicitDependencies = "YES">
+      buildImplicitDependencies = "NO">
       <BuildActionEntries>
          <BuildActionEntry
             buildForTesting = "YES"
@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "ACE63536290986850064C122"
-               BuildableName = "SwiftLint"
-               BlueprintName = "SwiftLint"
+               BlueprintIdentifier = "E83EAC791BED3D880085CCD2"
+               BuildableName = "CI"
+               BlueprintName = "CI"
                ReferencedContainer = "container:Realm.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -50,9 +50,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "ACE63536290986850064C122"
-            BuildableName = "SwiftLint"
-            BlueprintName = "SwiftLint"
+            BlueprintIdentifier = "E83EAC791BED3D880085CCD2"
+            BuildableName = "CI"
+            BlueprintName = "CI"
             ReferencedContainer = "container:Realm.xcodeproj">
          </BuildableReference>
       </MacroExpansion>

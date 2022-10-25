@@ -251,8 +251,9 @@ build_docs() {
         objc=""
     fi
 
+    echo ">>> RUN JAZZY"
     touch Realm/RLMPlatform.h # jazzy will fail if it can't find all public header files
-    jazzy \
+    bundle exec jazzy \
       "${objc}" \
       --clean \
       --author Realm \
@@ -850,6 +851,21 @@ case "$COMMAND" in
     # Docs
     ######################################
     "docs")
+        echo ">>> SETUP LOCAL GEM PATH"
+        echo 'export GEM_HOME=$HOME/gems' >>~/.bash_profile
+        echo 'export PATH=$HOME/gems/bin:$PATH' >>~/.bash_profile
+        export GEM_HOME=$HOME/gems
+        export PATH="$GEM_HOME/bin:$PATH"
+        export BUNDLE_USER_HOME=$HOME/.bundle
+
+        echo ">>> INSTALL REQUIRED BUNDLER VERSION"
+        gem install bundler -v "$(grep -A 1 "BUNDLED WITH" Gemfile.lock | tail -n 1)" --install-dir $GEM_HOME
+
+        echo ">>> INSTALL DEPENDENCIES"
+        bundle config --local path 'vendor/bundle'
+        bundle install --verbose
+
+        echo ">>> BUILD DOCS"
         build_docs objc
         build_docs swift
         exit 0

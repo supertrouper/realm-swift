@@ -18,15 +18,25 @@
 			name = "Download BaaS";
 			productName = "Download BaaS";
 		};
-		E83EAC791BED3D880085CCD2 /* SwiftLint */ = {
+		ACE63536290986850064C122 /* SwiftLint */ = {
 			isa = PBXAggregateTarget;
-			buildConfigurationList = E83EAC7C1BED3D880085CCD2 /* Build configuration list for PBXAggregateTarget "SwiftLint" */;
+			buildConfigurationList = ACE63539290986850064C122 /* Build configuration list for PBXAggregateTarget "SwiftLint" */;
 			buildPhases = (
-				E83EAC7D1BED3D8F0085CCD2 /* Run SwiftLint */,
+				ACE6353A290986D00064C122 /* Run Swiftlint */,
 			);
 			dependencies = (
 			);
 			name = SwiftLint;
+			productName = Swiftlint;
+		};
+		E83EAC791BED3D880085CCD2 /* CI */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = E83EAC7C1BED3D880085CCD2 /* Build configuration list for PBXAggregateTarget "CI" */;
+			buildPhases = (
+			);
+			dependencies = (
+			);
+			name = CI;
 			productName = SwiftLint;
 		};
 /* End PBXAggregateTarget section */
@@ -2479,6 +2489,9 @@
 					AC88475926888C6300DF4A65 = {
 						TestTargetID = AC8846722686573B00DF4A65;
 					};
+					ACE63536290986850064C122 = {
+						CreatedOnToolsVersion = 14.1;
+					};
 					E8267FB11D90B79000E001C7 = {
 						LastSwiftMigration = 1020;
 					};
@@ -2518,14 +2531,15 @@
 				5D660FD71BE98C7C0021E04F /* RealmSwift Tests */,
 				E8267FB11D90B79000E001C7 /* ObjectServerTests */,
 				E856D1DE195614A400FB2FCF /* iOS static tests */,
-				E83EAC791BED3D880085CCD2 /* SwiftLint */,
 				3F1A5E711992EB7400F45F4C /* TestHost */,
 				3F9D91802152D42F00474F09 /* TestHost static */,
-				49E57A16245C3F31004AF428 /* Download BaaS */,
 				53124AB725B71AF600771CE4 /* SwiftUITestHost */,
 				53124AD325B71AF700771CE4 /* SwiftUITests */,
 				AC8846722686573B00DF4A65 /* SwiftUISyncTestHost */,
 				AC88475926888C6300DF4A65 /* SwiftUISyncTests */,
+				49E57A16245C3F31004AF428 /* Download BaaS */,
+				E83EAC791BED3D880085CCD2 /* CI */,
+				ACE63536290986850064C122 /* SwiftLint */,
 			);
 		};
 /* End PBXProject section */
@@ -2717,6 +2731,24 @@
 			shellScript = "exec \"${SRCROOT}/scripts/generate-rlmversion.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		ACE6353A290986D00064C122 /* Run Swiftlint */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run Swiftlint";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if which swiftlint >/dev/null; then\n  sh build.sh verify-swiftlint\nelse\n  echo \"SwiftLint does not exist, download from https://github.com/realm/SwiftLint\"\nfi\n";
+		};
 		E8267FB81D90B79000E001C7 /* Get Version Number */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -2732,20 +2764,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "exec \"${SRCROOT}/scripts/generate-rlmversion.sh\"\n";
-		};
-		E83EAC7D1BED3D8F0085CCD2 /* Run SwiftLint */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Run SwiftLint";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if which swiftlint >/dev/null; then\n  swiftlint\nelse\n  echo \"SwiftLint does not exist, download from https://github.com/realm/SwiftLint\"\nfi\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -3537,6 +3555,22 @@
 			};
 			name = Release;
 		};
+		ACE63537290986850064C122 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		ACE63538290986850064C122 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
 		E8267FEB1D90B79000E001C7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 3FB56E7E250D457A00A6216B /* ObjectServerTests.xcconfig */;
@@ -3727,6 +3761,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		ACE63539290986850064C122 /* Build configuration list for PBXAggregateTarget "SwiftLint" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ACE63537290986850064C122 /* Debug */,
+				ACE63538290986850064C122 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		E8267FEA1D90B79000E001C7 /* Build configuration list for PBXNativeTarget "ObjectServerTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -3736,7 +3779,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		E83EAC7C1BED3D880085CCD2 /* Build configuration list for PBXAggregateTarget "SwiftLint" */ = {
+		E83EAC7C1BED3D880085CCD2 /* Build configuration list for PBXAggregateTarget "CI" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E83EAC7A1BED3D880085CCD2 /* Debug */,

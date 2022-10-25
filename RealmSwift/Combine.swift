@@ -1899,8 +1899,8 @@ public enum RealmPublishers {
         ///
         /// - parameter scheduler: The serial dispatch queue to receive values on.
         /// - returns: A publisher which delivers values to the given scheduler.
-        public func receive<S: Scheduler>(on scheduler: S) -> DeferredHandoverSectionedResultsChangeset<Self, Collection, S> {
-            DeferredHandoverSectionedResultsChangeset(self, scheduler)
+        public func receive<S: Scheduler>(on scheduler: S) -> DeferredSectionedResultsChangeset<Self, Collection, S> {
+            DeferredSectionedResultsChangeset(self, scheduler)
         }
     }
 
@@ -1982,8 +1982,8 @@ public enum RealmPublishers {
         ///
         /// - parameter scheduler: The serial dispatch queue to receive values on.
         /// - returns: A publisher which delivers values to the given scheduler.
-        public func receive<S: Scheduler>(on scheduler: S) -> DeferredHandoverSectionedResultsChangeset<Self, Collection, S> {
-            DeferredHandoverSectionedResultsChangeset(self, scheduler)
+        public func receive<S: Scheduler>(on scheduler: S) -> DeferredSectionedResultsChangeset<Self, Collection, S> {
+            DeferredSectionedResultsChangeset(self, scheduler)
         }
     }
 
@@ -2141,8 +2141,8 @@ public enum RealmPublishers {
         ///
         /// - parameter scheduler: The serial dispatch queue to receive values on.
         /// - returns: A publisher which delivers values to the given scheduler.
-        public func receive<S: Scheduler>(on scheduler: S) -> DeferredHandoverSectionedResultsChangeset<SectionedResultsChangesetWithToken, Collection, S> {
-            DeferredHandoverSectionedResultsChangeset(self, scheduler)
+        public func receive<S: Scheduler>(on scheduler: S) -> DeferredSectionedResultsChangeset<SectionedResultsChangesetWithToken, Collection, S> {
+            DeferredSectionedResultsChangeset(self, scheduler)
         }
     }
 
@@ -2392,8 +2392,8 @@ public enum RealmPublishers {
         ///
         /// - parameter scheduler: The serial dispatch queue to receive values on.
         /// - returns: A publisher which delivers values to the given scheduler.
-        public func receive<S: Scheduler>(on scheduler: S) -> DeferredHandoverSectionedResultsChangeset<Upstream, T, S> {
-            DeferredHandoverSectionedResultsChangeset(self.upstream, scheduler)
+        public func receive<S: Scheduler>(on scheduler: S) -> DeferredSectionedResultsChangeset<Upstream, T, S> {
+            DeferredSectionedResultsChangeset(self.upstream, scheduler)
         }
     }
 
@@ -2542,8 +2542,7 @@ public enum RealmPublishers {
     ///
     /// Create using `.threadSafeReference().receive(on: queue)` on a publisher
     /// that emits `RealmCollectionChange`.
-    // swiftlint:disable:next type_name
-    @frozen public struct DeferredHandoverSectionedResultsChangeset<Upstream: Publisher, T: RealmSectionedResult, S: Scheduler>: Publisher where Upstream.Output == RealmSectionedResultsChange<T> {
+    @frozen public struct DeferredSectionedResultsChangeset<Upstream: Publisher, T: RealmSectionedResult, S: Scheduler>: Publisher where Upstream.Output == RealmSectionedResultsChange<T> {
         /// :nodoc:
         public typealias Failure = Upstream.Failure
         /// :nodoc:

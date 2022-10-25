@@ -24,6 +24,7 @@ import Realm
  `SectionedResults` and `ResultSection`.
  */
 public protocol RealmSectionedResult: RandomAccessCollection, Equatable, ThreadConfined {
+    /// :nodoc:
     associatedtype Key: _Persistable, Hashable
     // MARK: Properties
 
@@ -992,6 +993,10 @@ extension ResultsSection where T: RLMObjectBase {
 @available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *)
 extension ResultsSection: Identifiable { }
 
+/**
+ A `RealmSectionedResultsChange` value encapsulates information about changes to the sectioned results
+ that are reported by Realm notifications.
+ */
 @frozen public enum RealmSectionedResultsChange<Collection> {
     /**
      `.initial` indicates that the initial run of the query has completed (if
