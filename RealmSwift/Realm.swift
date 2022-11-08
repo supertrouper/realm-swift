@@ -1168,7 +1168,7 @@ public typealias NotificationBlock = (_ notification: Realm.Notification, _ real
 extension Realm {
     /// Options for when to download all data from the server before opening
     /// a synchronized Realm.
-    @frozen public enum OpenBehavior {
+    @frozen public enum OpenBehavior: Sendable {
         /// Immediately return the Realm as if the synchronous initializer was
         /// used. If this is the first time that the Realm has been opened on
         /// this device, the Realm file will initially be empty. Synchronized

@@ -6,6 +6,10 @@ x.y.z Release notes (yyyy-MM-dd)
 * Allow initialising any sync configuration with `cancelAsyncOpenOnNonFatalErrors`.
 * Improve performance of Combine value publishers which do not use the
   object/collection changesets a little.
+* All public types have been audited for sendability and are now marked as
+  Sendable when applicable. A few types which were incidentally not thread-safe
+  but make sense to use from multiple threads are now thread-safe.
+* Add support for building Realm with strict concurrency checking enabled.
 
 ### Fixed
 * <How to hit and notice issue? what was the impact?> ([#????](https://github.com/realm/realm-swift/issues/????), since v?.?.?)
@@ -14,6 +18,9 @@ x.y.z Release notes (yyyy-MM-dd)
 * Fix `@AutoOpen` not returning a realm for a flexible sync configuration, 
   when there is no internet connection. 
   ([#7986](https://github.com/realm/realm-swift/issues/7986), since v10.27.0)
+* `@ObservedResults.remove()` could delete the wrong object if a write on a
+  background thread which changed the index of the object being removed
+  occurred at a very specific time (since v10.6.0).
 
 <!-- ### Breaking Changes - ONLY INCLUDE FOR NEW MAJOR version -->
 
