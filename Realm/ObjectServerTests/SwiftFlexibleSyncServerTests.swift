@@ -1243,14 +1243,14 @@ extension SwiftFlexibleSyncServerTests {
             config.objectTypes = [SwiftTypesSyncObject.self, SwiftPerson.self]
         }
         let c = config
-        _ = try await Task { @MainActor in
+        _ = try await DTask { @MainActor in
             let realm = try await Realm(configuration: c, downloadBeforeOpen: .always)
             XCTAssertNotNil(realm)
             XCTAssertEqual(realm.subscriptions.count, 1)
             checkCount(expected: 9, realm, SwiftTypesSyncObject.self)
         }.value
 
-        _ = try await Task { @MainActor in
+        _ = try await DTask { @MainActor in
             let realm = try await Realm(configuration: c, downloadBeforeOpen: .always)
             XCTAssertNotNil(realm)
             XCTAssertEqual(realm.subscriptions.count, 2)
