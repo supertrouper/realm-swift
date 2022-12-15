@@ -93,9 +93,11 @@ class BasePrimitiveSectionedResultsTests<TestData: SectionedResultsTestData>: RL
     }
 
     func testCreationFromMutableSet() {
-        let set = TestData.mutableSet(obj!)
-        assert(set)
-        assert(set, ascending: false)
+        if !TestData.skipSetTests {
+            let set = TestData.mutableSet(obj!)
+            assert(set)
+            assert(set, ascending: false)
+        }
     }
 
     func testCreationFromAnyRealmCollection() {
@@ -1220,6 +1222,7 @@ protocol SectionedResultsTestData {
     static func anyRealmCollection(_ obj: ModernAllTypesObject) -> AnyRealmCollection<Element>
     static func sectionBlock(_ element: Element) -> Key
     static var skipResultsTests: Bool { get }
+    static var skipSetTests: Bool { get }
 }
 
 protocol OptionalSectionedResultsTestData {
@@ -1242,6 +1245,9 @@ extension SectionedResultsTestData {
         AnyRealmCollection(results(obj))
     }
     static var skipResultsTests: Bool {
+        false
+    }
+    static var skipSetTests: Bool {
         false
     }
 }
@@ -1569,6 +1575,11 @@ struct SectionedResultsTestDataAnyRealmValue: SectionedResultsTestData {
 
     static func list(_ obj: ModernAllTypesObject) -> List<AnyRealmValue> {
         obj.arrayAny
+    }
+
+    // FIXME: Enable/FIx test when this is fixed on Core (https://github.com/realm/realm-core/issues/6118)
+    static var skipSetTests: Bool {
+        return true
     }
     static func mutableSet(_ obj: ModernAllTypesObject) -> MutableSet<AnyRealmValue> {
         obj.setAny
