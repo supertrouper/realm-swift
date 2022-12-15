@@ -86,8 +86,7 @@ class ThreadSafeReferenceTests: TestCase {
         }
         dispatchSyncNewThread {
             let realm = try! Realm()
-            XCTAssertEqual(self.assertResolve(realm, ref1)!.intCol, 0)
-            realm.refresh()
+            XCTAssertNil(self.assertResolve(realm, ref1))
             XCTAssertNil(self.assertResolve(realm, ref2))
         }
     }

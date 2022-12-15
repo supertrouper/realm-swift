@@ -99,8 +99,7 @@
     }];
     [self dispatchAsyncAndWait:^{
         RLMRealm *realm = [RLMRealm defaultRealm];
-        XCTAssertEqualObjects([self assertResolve:realm reference:ref1][@"intCol"], @0);
-        [realm refresh];
+        XCTAssertNil([self assertResolve:realm reference:ref1]);
         XCTAssertNil([self assertResolve:realm reference:ref2]);
     }];
 }
