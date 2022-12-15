@@ -1310,7 +1310,6 @@ class ObjectTests: TestCase {
 
         // Expect no notification for "owners" when "owner.name" is changed
         let ex = expectation(description: "no change notification")
-        ex.isInverted = true
         let token = dog.observe(keyPaths: ["owners"], { _ in
             ex.fulfill()
         })
