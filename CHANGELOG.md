@@ -6,9 +6,10 @@ x.y.z Release notes (yyyy-MM-dd)
 
 ### Fixed
 * Set<Mixed> consider string and binary data equivalent. This could cause the client to be inconsistent with the server if a string and some binary data with equivalent content was inserted from Atlas. ([Core PR #4860](https://github.com/realm/realm-core/issues/4860), since v10.8.0)
-* Fixed wrong assertion on query error that could result in a crash. ([#6038](https://github.com/realm/realm-core/issues/6038), since v10.21.1)
-* Not possible to open an encrypted file on a device with a page size bigger than the one on which the file was produced. ([#8030](https://github.com/realm/realm-swift/issues/8030), since v10.32.1)
-* Fix no notification for write transaction that contains only change to backlink property. ([#7493](https://github.com/realm/realm-swift/issues/7493), since v10.18.0)
+* Fixed wrong assertion on query error that could result in a crash. ([Core PR #6038](https://github.com/realm/realm-core/issues/6038), since v10.21.1)
+* Not possible to open an encrypted file on a device with a page size bigger than the one on which the file was produced. ([Core PR #8030](https://github.com/realm/realm-swift/issues/8030), since v10.32.1)
+* Fixed `realm_add_realm_refresh_callback` and notify immediately that there is not transaction snapshot to advance to. ([Core PR #6075](https://github.com/realm/realm-core/issues/6075), since v12.6.0)
+* Fix no notification for write transaction that contains only change to backlink property. ([Core PR #7493](https://github.com/realm/realm-swift/issues/7493), since v10.18.0)
 
 ### Breaking Changes
 * Encoding of Dictionary in the realm file has changed. This will change the order of the elements, so if any tests depend on the order, those must be revised.
