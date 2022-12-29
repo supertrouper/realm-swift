@@ -243,8 +243,8 @@ private class ObservableStorage<ObservedType>: ObservableObject where ObservedTy
         }
     }
 
-    var objectWillChange: ObservableStoragePublisher<ObservedType>
-    var keyPaths: [String]?
+    let objectWillChange: ObservableStoragePublisher<ObservedType>
+    let keyPaths: [String]?
 
     init(_ value: ObservedType, _ keyPaths: [String]? = nil) {
         self.value = value.realm != nil && !value.isInvalidated ? value.thaw() ?? value : value
@@ -262,6 +262,62 @@ private class ObservableStorage<ObservedType>: ObservableObject where ObservedTy
         self.value = value.realm != nil && !value.isInvalidated ? value.thaw() ?? value : value
         self.objectWillChange = ObservableStoragePublisher(value, keyPaths)
         self.keyPaths = keyPaths
+    }
+}
+
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+private class ObservableResultsStorage<T>: ObservableStorage<T> where T: RealmSubscribable & ThreadConfined & Equatable {
+    private var setupHasRun = false
+    func didSet() {
+        if setupHasRun {
+            updateValue()
+        }
+    }
+
+    func updateValue() {
+        // Implemented in subclasses
+        fatalError()
+    }
+
+    func setupValue() {
+        if !setupHasRun {
+            updateValue()
+            setupHasRun = true
+        }
+    }
+
+    var sortDescriptor: SortDescriptor? {
+        didSet {
+            didSet()
+        }
+    }
+
+    var filter: NSPredicate? {
+        didSet {
+            didSet()
+        }
+    }
+    var configuration: Realm.Configuration? {
+        didSet {
+            didSet()
+        }
+    }
+
+    var searchFilter: NSPredicate? {
+        didSet {
+            didSet()
+        }
+    }
+
+    private var searchString: String = ""
+    fileprivate func searchText<T: ObjectBase>(_ text: String, on keyPath: KeyPath<T, String>) {
+        guard text != searchString else { return }
+        if text.isEmpty {
+            searchFilter = nil
+        } else {
+            searchFilter = Query<T>()[dynamicMember: keyPath].contains(text).predicate
+        }
+        searchString = text
     }
 }
 
@@ -421,90 +477,41 @@ extension Projection: _ObservedResultsValue { }
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
 @propertyWrapper public struct ObservedResults<ResultType>: DynamicProperty, BoundCollection where ResultType: _ObservedResultsValue & RealmFetchable & KeypathSortable & Identifiable {
     public typealias Element = ResultType
-    private class Storage: ObservableStorage<Results<ResultType>> {
-        var setupHasRun = false
-        private func didSet() {
-            if setupHasRun {
-                setupValue()
-            }
-        }
-
-        func setupValue() {
-            /// A base value to reset the state of the query if a user reassigns the `filter` or `sortDescriptor`
+    private class Storage: ObservableResultsStorage<Results<ResultType>> {
+        override func updateValue() {
             let realm = try! Realm(configuration: configuration ?? Realm.Configuration.defaultConfiguration)
-            value = realm.objects(ResultType.self)
+            var value = realm.objects(ResultType.self)
             if let sortDescriptor = sortDescriptor {
                 value = value.sorted(byKeyPath: sortDescriptor.keyPath, ascending: sortDescriptor.ascending)
             }
 
-            let filters = [searchFilter, filter ?? `where`].compactMap { $0 }
+            let filters = [searchFilter, filter].compactMap { $0 }
             if !filters.isEmpty {
                 let compoundFilter = NSCompoundPredicate(andPredicateWithSubpredicates: filters)
                 value = value.filter(compoundFilter)
             }
-            setupHasRun = true
-        }
-
-        var sortDescriptor: SortDescriptor? {
-            didSet {
-                didSet()
-            }
-        }
-
-        var filter: NSPredicate? {
-            didSet {
-                didSet()
-            }
-        }
-        var `where`: NSPredicate? {
-            didSet {
-                didSet()
-            }
-        }
-        var configuration: Realm.Configuration? {
-            didSet {
-                didSet()
-            }
-        }
-
-        var searchString: String = ""
-        var searchFilter: NSPredicate? {
-            didSet {
-                didSet()
-            }
+            self.value = value
         }
     }
 
     @Environment(\.realmConfiguration) var configuration
     @ObservedObject private var storage: Storage
-    /// :nodoc:
     fileprivate func searchText<T: ObjectBase>(_ text: String, on keyPath: KeyPath<T, String>) {
-        if text.isEmpty {
-            if storage.searchFilter != nil {
-                storage.searchFilter = nil
-            }
-        } else if text != storage.searchString {
-            storage.searchFilter = Query<T>()[dynamicMember: keyPath].contains(text).predicate
-        }
-        storage.searchString = text
+        storage.searchText(text, on: keyPath)
     }
+
     /// Stores an NSPredicate used for filtering the Results. This is mutually exclusive
     /// to the `where` parameter.
     @State public var filter: NSPredicate? {
         willSet {
-            storage.where = nil
             storage.filter = newValue
         }
     }
     /// Stores a type safe query used for filtering the Results. This is mutually exclusive
     /// to the `filter` parameter.
     @State public var `where`: ((Query<ResultType>) -> Query<Bool>)? {
-        // The introduction of this property produces a compiler bug in
-        // Xcode 12.5.1. So Swift Queries are supported on Xcode 13 and above
-        // when used with SwiftUI.
         willSet {
-            storage.filter = nil
-            storage.where = newValue?(Query()).predicate
+            storage.filter = newValue?(Query()).predicate
         }
     }
     /// :nodoc:
@@ -515,9 +522,7 @@ extension Projection: _ObservedResultsValue { }
     }
     /// :nodoc:
     public var wrappedValue: Results<ResultType> {
-        if !storage.setupHasRun {
-            storage.setupValue()
-        }
+        storage.setupValue()
         return storage.configuration != nil ? storage.value.freeze() : storage.value
     }
     /// :nodoc:
@@ -605,7 +610,7 @@ extension Projection: _ObservedResultsValue { }
         self.sortDescriptor = sortDescriptor
     }
 
-    public mutating func update() {
+    public func update() {
         // When the view updates, it will inject the @Environment
         // into the propertyWrapper
         if storage.configuration == nil {
@@ -613,6 +618,364 @@ extension Projection: _ObservedResultsValue { }
         }
     }
 }
+
+/// A property wrapper type that represents a sectioned results collection.
+///
+/// The sectioned results use the realm configuration provided by
+/// the environment value `EnvironmentValues/realmConfiguration`
+/// if `configuration` is not set in the initializer.
+///
+///
+/// Given `@ObservedSectionedResults var v` in SwiftUI, `$v` refers to a `BoundCollection`.
+///
+@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
+@propertyWrapper public struct ObservedSectionedResults<Key: _Persistable & Hashable, ResultType>: DynamicProperty, BoundCollection where ResultType: _ObservedResultsValue & RealmFetchable & KeypathSortable & Identifiable {
+    public typealias Element = ResultType
+
+    private class Storage: ObservableResultsStorage<SectionedResults<Key, ResultType>> {
+        override func updateValue() {
+            let realm = try! Realm(configuration: configuration ?? Realm.Configuration.defaultConfiguration)
+            var results = realm.objects(ResultType.self)
+
+            let filters = [searchFilter, filter].compactMap { $0 }
+            if !filters.isEmpty {
+                let compoundFilter = NSCompoundPredicate(andPredicateWithSubpredicates: filters)
+                results = results.filter(compoundFilter)
+            }
+
+            if let keyPathString = keyPathString, sortDescriptors.isEmpty {
+                sortDescriptors.append(.init(keyPath: keyPathString, ascending: true))
+            }
+
+            value = results.sectioned(sortDescriptors: sortDescriptors, sectionBlock)
+        }
+
+        var sortDescriptors: [SortDescriptor] = [] {
+            didSet {
+                didSet()
+            }
+        }
+        var sectionBlock: ((ResultType) -> Key)
+        var keyPathString: String?
+
+        init(_ value: Results<ResultType>,
+             sectionBlock: @escaping ((ResultType) -> Key),
+             sortDescriptors: [SortDescriptor],
+             keyPathString: String? = nil,
+             keyPaths: [String]? = nil) {
+            self.sectionBlock = sectionBlock
+            self.sortDescriptors = sortDescriptors
+            if let keyPathString = keyPathString {
+                self.keyPathString = keyPathString
+                self.sortDescriptors.append(.init(keyPath: keyPathString, ascending: true))
+            }
+            if self.sortDescriptors.isEmpty {
+                throwRealmException("sortDescriptors must not be empty when sectioning ObservedSectionedResults with `sectionBlock`")
+            }
+            super.init(value.sectioned(sortDescriptors: self.sortDescriptors, self.sectionBlock), keyPaths)
+        }
+    }
+
+    @Environment(\.realmConfiguration) var configuration
+    @ObservedObject private var storage: Storage
+    /// :nodoc:
+    fileprivate func searchText<T: ObjectBase>(_ text: String, on keyPath: KeyPath<T, String>) {
+        storage.searchText(text, on: keyPath)
+    }
+    /// Stores an NSPredicate used for filtering the SectionedResults. This is mutually exclusive
+    /// to the `where` parameter.
+    @State public var filter: NSPredicate? {
+        willSet {
+            storage.filter = newValue
+        }
+    }
+    /// Stores a type safe query used for filtering the SectionedResults. This is mutually exclusive
+    /// to the `filter` parameter.
+    @State public var `where`: ((Query<ResultType>) -> Query<Bool>)? {
+        willSet {
+            storage.filter = newValue?(Query()).predicate
+        }
+    }
+    /// :nodoc:
+    @State public var sortDescriptors: [SortDescriptor] = [] {
+        willSet {
+            storage.sortDescriptors = newValue
+        }
+    }
+    /// :nodoc:
+    public var wrappedValue: SectionedResults<Key, ResultType> {
+        storage.setupValue()
+        return storage.value
+    }
+    /// :nodoc:
+    public var projectedValue: Self {
+        return self
+    }
+
+    private init(type: ResultType.Type,
+                 sectionBlock: @escaping ((ResultType) -> Key),
+                 sortDescriptors: [SortDescriptor] = [],
+                 filter: NSPredicate? = nil,
+                 where: ((Query<ResultType>) -> Query<Bool>)? = nil,
+                 keyPaths: [String]? = nil,
+                 keyPathString: String? = nil,
+                 configuration: Realm.Configuration? = nil) where ResultType: AnyObject {
+        let results = Results<ResultType>(RLMResults<ResultType>.emptyDetached())
+        self.storage = Storage(results,
+                               sectionBlock: sectionBlock,
+                               sortDescriptors: sortDescriptors,
+                               keyPathString: keyPathString,
+                               keyPaths: keyPaths)
+        self.storage.configuration = configuration
+        if let filter = filter {
+            self.filter = filter
+        } else if let `where` = `where` {
+            self.where = `where`
+        }
+        self.sortDescriptors = sortDescriptors
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Projection` type.
+     - parameter type: Observed type
+     - parameter sectionKeyPath: The keyPath that will produce the key for each section.
+     For every unique value retrieved from the keyPath a section key will be generated.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter filter: Observations will be made only for passing objects.
+     If no filter given - all objects will be observed
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init<ObjectType: ObjectBase>(_ type: ResultType.Type,
+                                        sectionKeyPath: KeyPath<ResultType, Key>,
+                                        sortDescriptors: [SortDescriptor] = [],
+                                        filter: NSPredicate? = nil,
+                                        keyPaths: [String]? = nil,
+                                        configuration: Realm.Configuration? = nil) where ResultType: Projection<ObjectType>, ObjectType: ThreadConfined {
+        self.init(type: type,
+                  sectionBlock: { (obj: ResultType) in obj[keyPath: sectionKeyPath] },
+                  sortDescriptors: sortDescriptors,
+                  filter: filter,
+                  keyPaths: keyPaths,
+                  keyPathString: _name(for: sectionKeyPath),
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Projection` type.
+     - parameter type: Observed type
+     - parameter sectionBlock: A callback which returns the section key for each object in the collection.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter filter: Observations will be made only for passing objects.
+     If no filter given - all objects will be observed
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init<ObjectType: ObjectBase>(_ type: ResultType.Type,
+                                        sectionBlock: @escaping ((ResultType) -> Key),
+                                        sortDescriptors: [SortDescriptor] = [],
+                                        filter: NSPredicate? = nil,
+                                        keyPaths: [String]? = nil,
+                                        configuration: Realm.Configuration? = nil) where ResultType: Projection<ObjectType>, ObjectType: ThreadConfined {
+        self.init(type: type,
+                  sectionBlock: sectionBlock,
+                  sortDescriptors: sortDescriptors,
+                  filter: filter,
+                  keyPaths: keyPaths,
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionKeyPath: The keyPath that will produce the key for each section.
+     For every unique value retrieved from the keyPath a section key will be generated.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter filter: Observations will be made only for passing objects.
+     If no filter given - all objects will be observed
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionKeyPath: KeyPath<ResultType, Key>,
+                sortDescriptors: [SortDescriptor] = [],
+                filter: NSPredicate? = nil,
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: { (obj: ResultType) in obj[keyPath: sectionKeyPath] },
+                  sortDescriptors: sortDescriptors,
+                  filter: filter,
+                  keyPaths: keyPaths,
+                  keyPathString: _name(for: sectionKeyPath),
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionBlock: A callback which returns the section key for each object in the collection.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter filter: Observations will be made only for passing objects.
+     If no filter given - all objects will be observed
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionBlock: @escaping ((ResultType) -> Key),
+                sortDescriptors: [SortDescriptor] = [],
+                filter: NSPredicate? = nil,
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: sectionBlock,
+                  sortDescriptors: sortDescriptors,
+                  filter: filter,
+                  keyPaths: keyPaths,
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionBlock: A callback which returns the section key for each object in the collection.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter where: Observations will be made only for passing objects.
+     If no type safe query is given - all objects will be observed.
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionBlock: @escaping ((ResultType) -> Key),
+                sortDescriptors: [SortDescriptor] = [],
+                where: ((Query<ResultType>) -> Query<Bool>)? = nil,
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: sectionBlock,
+                  sortDescriptors: sortDescriptors,
+                  where: `where`,
+                  keyPaths: keyPaths,
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionKeyPath: The keyPath that will produce the key for each section.
+     For every unique value retrieved from the keyPath a section key will be generated.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter where: Observations will be made only for passing objects.
+     If no type safe query is given - all objects will be observed.
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionKeyPath: KeyPath<ResultType, Key>,
+                sortDescriptors: [SortDescriptor] = [],
+                where: ((Query<ResultType>) -> Query<Bool>)? = nil,
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: { (obj: ResultType) in obj[keyPath: sectionKeyPath] },
+                  sortDescriptors: sortDescriptors,
+                  where: `where`,
+                  keyPaths: keyPaths,
+                  keyPathString: _name(for: sectionKeyPath),
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionKeyPath: The keyPath that will produce the key for each section.
+     For every unique value retrieved from the keyPath a section key will be generated.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionKeyPath: KeyPath<ResultType, Key>,
+                sortDescriptors: [SortDescriptor] = [],
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: { (obj: ResultType) in obj[keyPath: sectionKeyPath] },
+                  sortDescriptors: sortDescriptors,
+                  keyPaths: keyPaths,
+                  keyPathString: _name(for: sectionKeyPath),
+                  configuration: configuration)
+    }
+
+    /**
+     Initialize a `ObservedSectionedResults` struct for a given `Object` or `EmbeddedObject` type.
+     - parameter type: Observed type
+     - parameter sectionBlock: A callback which returns the section key for each object in the collection.
+     - parameter sortDescriptors: A sequence of `SortDescriptor`s to sort by.
+     - parameter keyPaths: Only properties contained in the key paths array will be observed.
+     If `nil`, notifications will be delivered for any property change on the object.
+     String key paths which do not correspond to a valid a property will throw an exception.
+     - parameter configuration: The `Realm.Configuration` used when creating the Realm.
+     If empty the configuration is set to the `defaultConfiguration`
+
+     - note: The primary sort descriptor must be responsible for determining the section key.
+     */
+    public init(_ type: ResultType.Type,
+                sectionBlock: @escaping ((ResultType) -> Key),
+                sortDescriptors: [SortDescriptor],
+                keyPaths: [String]? = nil,
+                configuration: Realm.Configuration? = nil) where ResultType: Object {
+        self.init(type: type,
+                  sectionBlock: sectionBlock,
+                  sortDescriptors: sortDescriptors,
+                  keyPaths: keyPaths,
+                  configuration: configuration)
+    }
+
+    public func update() {
+        // When the view updates, it will inject the @Environment
+        // into the propertyWrapper
+        if storage.configuration == nil {
+            storage.configuration = configuration
+        }
+    }
+}
+
 
 // MARK: ObservedRealmObject
 
@@ -1108,7 +1471,30 @@ private class ObservableAsyncOpenStorage: ObservableObject {
         }
     }
 
-    func asyncOpen() {
+    fileprivate func update(_ partitionValue: PartitionValue?, _ configuration: Realm.Configuration) {
+        var open = false
+        if let partitionValue = partitionValue {
+            let bsonValue = AnyBSON(partitionValue: partitionValue)
+            if self.partitionValue != bsonValue {
+                self.partitionValue = bsonValue
+                open = true
+            }
+        }
+
+        // We don't want to use the `defaultConfiguration` from the environment, we only want to use this environment value in @AsyncOpen if is not the default one
+        if configuration != .defaultConfiguration, self.configuration != configuration {
+            if let partitionValue = configuration.syncConfiguration?.partitionValue {
+                self.partitionValue = partitionValue
+            }
+            self.configuration = configuration
+            open = true
+        }
+        if open {
+            self.asyncOpen()
+        }
+    }
+
+    private func asyncOpen() {
         if case let .loggedIn(user) = appState {
             asyncOpenForUser(user)
         }
@@ -1122,7 +1508,7 @@ private class ObservableAsyncOpenStorage: ObservableObject {
         if let partitionValue = partitionValue {
             config = user.configuration(partitionValue: partitionValue, cancelAsyncOpenOnNonFatalErrors: true)
         } else {
-            config = user.flexibleSyncConfiguration()
+            config = user.flexibleSyncConfiguration(cancelAsyncOpenOnNonFatalErrors: true)
         }
 
         // Use the user configuration by default or set configuration with the current user `syncConfiguration`'s.
@@ -1333,24 +1719,8 @@ private class ObservableAsyncOpenStorage: ObservableObject {
         storage = ObservableAsyncOpenStorage(asyncOpenKind: .asyncOpen, app: app, configuration: configuration, partitionValue: nil)
     }
 
-    public mutating func update() {
-        if let partitionValue = partitionValue {
-            let bsonValue = AnyBSON(partitionValue: partitionValue)
-            if storage.partitionValue != bsonValue {
-                storage.partitionValue = bsonValue
-                storage.asyncOpen()
-            }
-        }
-
-        // We don't want to use the `defaultConfiguration` from the environment, we only want to use this environment value in @AsyncOpen if is not the default one
-        if configuration != .defaultConfiguration,
-           storage.configuration != configuration {
-            if let partitionValue = configuration.syncConfiguration?.partitionValue {
-                storage.partitionValue = partitionValue
-            }
-            storage.configuration = configuration
-            storage.asyncOpen()
-        }
+    public func update() {
+        storage.update(partitionValue, configuration)
     }
 }
 
@@ -1458,24 +1828,8 @@ private class ObservableAsyncOpenStorage: ObservableObject {
         storage = ObservableAsyncOpenStorage(asyncOpenKind: .autoOpen, app: app, configuration: configuration, partitionValue: nil)
     }
 
-    public mutating func update() {
-        if let partitionValue = partitionValue {
-            let bsonValue = AnyBSON(partitionValue: partitionValue)
-            if storage.partitionValue != bsonValue {
-                storage.partitionValue = bsonValue
-                storage.asyncOpen()
-            }
-        }
-
-        // We don't want to use the `defaultConfiguration` from the environment, we only want to use this environment value in @AsyncOpen if is not the default one
-        if configuration != .defaultConfiguration,
-           storage.configuration != configuration {
-            if let partitionValue = configuration.syncConfiguration?.partitionValue {
-                storage.partitionValue = partitionValue
-            }
-            storage.configuration = configuration
-            storage.asyncOpen()
-        }
+    public func update() {
+        storage.update(partitionValue, configuration)
     }
 }
 
@@ -1582,9 +1936,7 @@ extension View {
                                           keyPath: KeyPath<T, String>, placement: SearchFieldPlacement = .automatic,
                                           prompt: LocalizedStringKey) -> some View {
         filterCollection(collection, for: text.wrappedValue, on: keyPath)
-        return searchable(text: text,
-                          placement: placement,
-                          prompt: prompt)
+        return searchable(text: text, placement: placement, prompt: prompt)
     }
 
     /// Marks this view as searchable, which configures the display of a search field.
@@ -1770,6 +2122,301 @@ extension View {
     }
 
     private func filterCollection<T: ObjectBase>(_ collection: ObservedResults<T>, for text: String, on keyPath: KeyPath<T, String>) {
+        DispatchQueue.main.async {
+            collection.searchText(text, on: keyPath)
+        }
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedSectionedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:)-6royb>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection, only key paths with `String` type are allowed.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: A `Text` representing the prompt of the search field
+                which provides users with guidance on what to search for.
+     */
+    public func searchable<Key, T: ObjectBase>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>, keyPath: KeyPath<T, String>,
+                                               placement: SearchFieldPlacement = .automatic, prompt: Text? = nil) -> some View {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text, placement: placement, prompt: prompt)
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:)-2ed8t>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: The key for the localized prompt of the search field
+                which provides users with guidance on what to search for.
+     */
+    public func searchable<Key, T: ObjectBase>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>,
+                                               keyPath: KeyPath<T, String>, placement: SearchFieldPlacement = .automatic,
+                                               prompt: LocalizedStringKey) -> some View {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text, placement: placement, prompt: prompt)
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:)-58egp>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: A string representing the prompt of the search field
+                which provides users with guidance on what to search for.
+     */
+    public func searchable<Key, T: ObjectBase, S>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>, keyPath: KeyPath<T, String>,
+                                                  placement: SearchFieldPlacement = .automatic, prompt: S) -> some View where S: StringProtocol {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text, placement: placement, prompt: prompt)
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt:suggestions)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:suggestions:)-94bdu>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: A `Text` representing the prompt of the search field
+                which provides users with guidance on what to search for.
+    - parameter suggestions: A view builder that produces content that
+                populates a list of suggestions.
+     */
+    public func searchable<Key, T: ObjectBase, S>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>, keyPath: KeyPath<T, String>,
+                                                  placement: SearchFieldPlacement = .automatic, prompt: Text? = nil, @ViewBuilder suggestions: () -> S)
+    -> some View where S: View {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text,
+                          placement: placement,
+                          prompt: prompt,
+                          suggestions: suggestions)
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt:suggestions)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:suggestions:)-1mw1m>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: The key for the localized prompt of the search field
+                which provides users with guidance on what to search for.
+    - parameter suggestions: A view builder that produces content that
+                populates a list of suggestions.
+     */
+    public func searchable<Key, T: ObjectBase, S>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>, keyPath: KeyPath<T, String>,
+                                                  placement: SearchFieldPlacement = .automatic, prompt: LocalizedStringKey, @ViewBuilder suggestions: () -> S)
+    -> some View where S: View {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text,
+                          placement: placement,
+                          prompt: prompt,
+                          suggestions: suggestions)
+    }
+
+    /// Marks this view as searchable, which configures the display of a search field.
+    /// You can provide a collection and a key path to be filtered using the search
+    /// field string provided by the searchable component, this will result in the collection
+    /// querying for all items containing the search field string for the given key path.
+    ///
+    ///     @State var searchString: String
+    ///     @ObservedResults(Reminder.self) var reminders
+    ///
+    ///     List {
+    ///         ForEach(reminders) { reminderSection in
+    ///             Section(reminderSection.key) {
+    ///                 ForEach(reminderSection) { object in
+    ///                     ReminderRowView(reminder: object)
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    ///     .searchable(text: $searchFilter,
+    ///                 collection: $reminders,
+    ///                 keyPath: \.name) {
+    ///         ForEach(reminders) { remindersFiltered in
+    ///             Text(remindersFiltered.name).searchCompletion(remindersFiltered.name)
+    ///         }
+    ///     }
+    ///
+    /**
+    - Note: See ``SwiftUI/View/searchable(text:placement:prompt:suggestions)``
+            <https://developer.apple.com/documentation/swiftui/form/searchable(text:placement:prompt:suggestions:)-6h6qo>
+            for more information on searchable view modifier.
+
+    - parameter text: The text to display and edit in the search field.
+    - parameter collection: The collection to be filtered.
+    - parameter keyPath: The key path to the property which will be used to filter
+                the collection.
+    - parameter placement: The preferred placement of the search field within the
+                containing view hierarchy.
+    - parameter prompt: A string representing the prompt of the search field
+                which provides users with guidance on what to search for.
+    - parameter suggestions: A view builder that produces content that
+                populates a list of suggestions.
+     */
+    public func searchable<Key, T: ObjectBase, V, S>(text: Binding<String>, collection: ObservedSectionedResults<Key, T>, keyPath: KeyPath<T, String>,
+                                                     placement: SearchFieldPlacement = .automatic, prompt: S, @ViewBuilder suggestions: () -> V)
+    -> some View where V: View, S: StringProtocol {
+        filterCollection(collection, for: text.wrappedValue, on: keyPath)
+        return searchable(text: text,
+                          placement: placement,
+                          prompt: prompt,
+                          suggestions: suggestions)
+    }
+
+    private func filterCollection<Key, T: ObjectBase>(_ collection: ObservedSectionedResults<Key, T>, for text: String, on keyPath: KeyPath<T, String>) {
         DispatchQueue.main.async {
             collection.searchText(text, on: keyPath)
         }

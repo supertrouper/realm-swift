@@ -63,10 +63,8 @@ class PrimitiveMapTests<O: ObjectFactory, V: MapValueFactory>: PrimitiveMapTests
         map.merge(values) { $1 }
         let exp = expectation(description: "did enumerate all keys and values")
         exp.expectedFulfillmentCount = 3
-        for element in map {
-            if values.filter({ $0.key == element.key }).first!.value == element.value {
-                exp.fulfill()
-            }
+        for element in map where values.filter({ $0.key == element.key }).first!.value == element.value {
+            exp.fulfill()
         }
         waitForExpectations(timeout: 1.0, handler: nil)
     }
@@ -348,6 +346,7 @@ class ManagedPrimitiveMapTests: TestCase {
         SortablePrimitiveMapTests<ManagedObjectFactory, Double>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, String>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, Date>.defaultTestSuite.tests.forEach(suite.addTest)
+        SortablePrimitiveMapTests<ManagedObjectFactory, Data>.defaultTestSuite.tests.forEach(suite.addTest)
 
         SortablePrimitiveMapTests<ManagedObjectFactory, Int?>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, Int8?>.defaultTestSuite.tests.forEach(suite.addTest)
@@ -358,6 +357,7 @@ class ManagedPrimitiveMapTests: TestCase {
         SortablePrimitiveMapTests<ManagedObjectFactory, Double?>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, String?>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, Date?>.defaultTestSuite.tests.forEach(suite.addTest)
+        SortablePrimitiveMapTests<ManagedObjectFactory, Data?>.defaultTestSuite.tests.forEach(suite.addTest)
 
         SortablePrimitiveMapTests<ManagedObjectFactory, EnumInt>.defaultTestSuite.tests.forEach(suite.addTest)
         SortablePrimitiveMapTests<ManagedObjectFactory, EnumInt8>.defaultTestSuite.tests.forEach(suite.addTest)

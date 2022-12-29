@@ -20,13 +20,6 @@
 #import "RLMSyncSubscription_Private.h"
 #import "RLMApp_Private.hpp"
 
-// These are defined in Swift. Importing the auto-generated header doesn't work
-// when building with SPM, so just redeclare the bits we need.
-@interface RealmServer : NSObject
-+ (RealmServer *)shared;
-- (NSString *)createAppWithQueryableFields:(NSArray *)queryableFields error:(NSError **)error;
-@end
-
 @interface TimeoutProxyServer : NSObject
 - (instancetype)initWithPort:(uint16_t)port targetPort:(uint16_t)targetPort;
 - (void)startAndReturnError:(NSError **)error;
@@ -52,7 +45,9 @@
 }
 
 - (void)testGetSubscriptionsWhenLocalRealm {
-    RLMRealm *realm = [RLMRealm defaultRealm];
+    RLMRealmConfiguration *configuration = [RLMRealmConfiguration defaultConfiguration];
+    configuration.objectClasses = @[Person.self];
+    RLMRealm *realm = [RLMRealm realmWithConfiguration:configuration error:nil];
     RLMAssertThrowsWithReason(realm.subscriptions, @"This Realm was not configured with flexible sync");
 }
 
@@ -906,15 +901,19 @@
     }];
     CHECK_COUNT(3, Person, realm);
 
-    auto ex = [self expectationWithDescription:@"should client reset"];
-    [self.flexibleSyncApp syncManager].errorHandler = ^(NSError * error, RLMSyncSession *) {
-        XCTAssertNotNil(error);
+    RLMObjectId *invalidObjectPK = [RLMObjectId objectId];
+    auto ex = [self expectationWithDescription:@"should revert write"];
+    self.flexibleSyncApp.syncManager.errorHandler = ^(NSError *error, RLMSyncSession *) {
+        RLMValidateError(error, RLMSyncErrorDomain, RLMSyncErrorWriteRejected,
+                         @"Client attempted a write that is outside of permissions or query filters; it has been reverted");
         [ex fulfill];
     };
     [realm transactionWithBlock:^{
-        [realm addObject:[[Person alloc] initWithPrimaryKey:[RLMObjectId objectId] age:10 firstName:@"Nic" lastName:@"Cages"]];
+        [realm addObject:[[Person alloc] initWithPrimaryKey:invalidObjectPK age:10 firstName:@"Nic" lastName:@"Cages"]];
     }];
     [self waitForExpectations:@[ex] timeout:20];
+    [self waitForDownloadsForRealm:realm];
+    CHECK_COUNT(3, Person, realm);
 }
 
 - (void)testFlexibleSyncInitialSubscription {
@@ -950,6 +949,11 @@
                                 callback:^(RLMRealm *realm, NSError *error) {
         XCTAssertNil(error);
         XCTAssertEqual(realm.subscriptions.count, 1UL);
+        // Adding this sleep, because there seems to be a timing issue after this commit in baas
+        // https://github.com/10gen/baas/commit/64e75b3f1fe8a6f8704d1597de60f9dda401ccce,
+        // data take a little longer to be downloaded to the realm even though the
+        // sync client changed the subscription state to completed.
+        sleep(1);
         CHECK_COUNT(11, Person, realm);
         [ex fulfill];
     }];
@@ -1002,12 +1006,18 @@
     [RLMRealm asyncOpenWithConfiguration:config
                            callbackQueue:dispatch_get_main_queue()
                                 callback:^(RLMRealm *realm, NSError *error) {
+        XCTAssertNotNil(realm);
         XCTAssertNil(error);
         XCTAssertEqual(realm.subscriptions.count, 1UL);
+        // Adding this sleep, because there seems to be a timing issue after this commit in baas
+        // https://github.com/10gen/baas/commit/64e75b3f1fe8a6f8704d1597de60f9dda401ccce,
+        // data take a little longer to be downloaded to the realm even though the
+        // sync client changed the subscription state to completed.
+        sleep(1);
         CHECK_COUNT(11, Person, realm);
         [ex fulfill];
     }];
-    [self waitForExpectationsWithTimeout:30.0 handler:nil];
+    [self waitForExpectationsWithTimeout:90.0 handler:nil];
     XCTAssertEqual(openCount, 1);
 
     __block RLMRealm *realm;
@@ -1016,12 +1026,13 @@
                            callbackQueue:dispatch_get_main_queue()
                                 callback:^(RLMRealm *r, NSError *error) {
         realm = r;
+        XCTAssertNotNil(realm);
         XCTAssertNil(error);
         XCTAssertEqual(realm.subscriptions.count, 2UL);
         CHECK_COUNT(16, Person, realm);
         [ex2 fulfill];
     }];
-    [self waitForExpectationsWithTimeout:30.0 handler:nil];
+    [self waitForExpectationsWithTimeout:90.0 handler:nil];
     XCTAssertEqual(openCount, 2);
 
     [self dispatchAsyncAndWait:^{
@@ -1066,9 +1077,8 @@
     [RLMRealm asyncOpenWithConfiguration:config
                            callbackQueue:dispatch_get_main_queue()
                                 callback:^(RLMRealm *realm, NSError *error) {
-        XCTAssertNotNil(error);
-        XCTAssertEqual(error.code, ETIMEDOUT);
-        XCTAssertEqual(error.domain, NSPOSIXErrorDomain);
+        RLMValidateError(error, NSPOSIXErrorDomain, ETIMEDOUT,
+                         @"Sync connection was not fully established in time");
         XCTAssertNil(realm);
         [ex fulfill];
     }];
@@ -1088,11 +1098,9 @@
     [RLMRealm asyncOpenWithConfiguration:config
                            callbackQueue:dispatch_get_main_queue()
                                 callback:^(RLMRealm *realm, NSError *error) {
-        XCTAssertNotNil(error);
-        XCTAssertEqual(error.code, 2);
-        XCTAssertTrue([error.domain isEqualToString: @"io.realm.sync.flx"]); // This is a flexible sync error when the query property is not a queryable field, realm is opened but the subscription could not be completed.
+        RLMValidateError(error, RLMErrorDomain, RLMErrorSubscriptionFailed,
+                         @"Client provided query with bad syntax: unsupported query for table \"UUIDPrimaryKeyObject\": key \"strCol\" is not a queryable field");
         XCTAssertNotNil(realm);
-
         [ex fulfill];
     }];
     [self waitForExpectationsWithTimeout:30.0 handler:nil];

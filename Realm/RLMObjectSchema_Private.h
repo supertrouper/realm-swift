@@ -20,7 +20,7 @@
 
 #import <objc/runtime.h>
 
-NS_ASSUME_NONNULL_BEGIN
+RLM_HEADER_AUDIT_BEGIN(nullability)
 
 // RLMObjectSchema private
 @interface RLMObjectSchema () {
@@ -35,6 +35,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, readwrite, copy) NSArray<RLMProperty *> *properties;
 @property (nonatomic, readwrite, assign) bool isSwiftClass;
 @property (nonatomic, readwrite, assign) BOOL isEmbedded;
+@property (nonatomic, readwrite, assign) BOOL isAsymmetric;
 
 // class used for this object schema
 @property (nonatomic, readwrite, assign) Class objectClass;
@@ -71,4 +72,4 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithClassName:(NSString *)objectClassName objectClass:(Class)objectClass properties:(NSArray *)properties;
 @end
 
-NS_ASSUME_NONNULL_END
+RLM_HEADER_AUDIT_END(nullability)

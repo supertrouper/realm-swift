@@ -38,13 +38,6 @@
 
 #if TARGET_OS_OSX
 
-@interface RealmServer : NSObject
-+ (RealmServer *)shared;
-+ (bool)haveServer;
-- (NSString *)createAppAndReturnError:(NSError **)error;
-- (NSString *)createAppWithQueryableFields:(NSArray *)queryableFields error:(NSError **)error;
-@end
-
 // Set this to 1 if you want the test ROS instance to log its debug messages to console.
 #define LOG_ROS_OUTPUT 0
 
@@ -84,7 +77,6 @@
     }
 }
 @end
-
 
 static NSURL *syncDirectoryForChildProcess() {
     NSString *path = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, YES)[0];
@@ -176,6 +168,17 @@ static NSURL *syncDirectoryForChildProcess() {
 - (RLMRealm *)openRealmForPartitionValue:(nullable id<RLMBSON>)partitionValue user:(RLMUser *)user {
     return [self openRealmForPartitionValue:partitionValue
                                        user:user
+                            clientResetMode:RLMClientResetModeRecoverUnsyncedChanges
+                              encryptionKey:nil
+                                 stopPolicy:RLMSyncStopPolicyAfterChangesUploaded];
+}
+
+- (RLMRealm *)openRealmForPartitionValue:(nullable id<RLMBSON>)partitionValue
+                                    user:(RLMUser *)user
+                         clientResetMode:(RLMClientResetMode)clientResetMode {
+    return [self openRealmForPartitionValue:partitionValue
+                                       user:user
+                            clientResetMode:clientResetMode
                               encryptionKey:nil
                                  stopPolicy:RLMSyncStopPolicyAfterChangesUploaded];
 }
@@ -184,8 +187,21 @@ static NSURL *syncDirectoryForChildProcess() {
                                     user:(RLMUser *)user
                            encryptionKey:(nullable NSData *)encryptionKey
                               stopPolicy:(RLMSyncStopPolicy)stopPolicy {
+    return [self openRealmForPartitionValue:partitionValue
+                                       user:user
+                            clientResetMode:RLMClientResetModeRecoverUnsyncedChanges
+                              encryptionKey:encryptionKey
+                                 stopPolicy:stopPolicy];
+}
+
+- (RLMRealm *)openRealmForPartitionValue:(nullable id<RLMBSON>)partitionValue
+                                    user:(RLMUser *)user
+                         clientResetMode:(RLMClientResetMode)clientResetMode
+                           encryptionKey:(nullable NSData *)encryptionKey
+                              stopPolicy:(RLMSyncStopPolicy)stopPolicy {
     RLMRealm *realm = [self immediatelyOpenRealmForPartitionValue:partitionValue
                                                              user:user
+                                                  clientResetMode:clientResetMode
                                                     encryptionKey:encryptionKey
                                                        stopPolicy:stopPolicy];
     [self waitForDownloadsForRealm:realm];
@@ -235,6 +251,15 @@ static NSURL *syncDirectoryForChildProcess() {
 - (RLMRealm *)immediatelyOpenRealmForPartitionValue:(NSString *)partitionValue user:(RLMUser *)user {
     return [self immediatelyOpenRealmForPartitionValue:partitionValue
                                                   user:user
+                                       clientResetMode:RLMClientResetModeRecoverUnsyncedChanges];
+}
+
+- (RLMRealm *)immediatelyOpenRealmForPartitionValue:(NSString *)partitionValue
+                                               user:(RLMUser *)user
+                                    clientResetMode:(RLMClientResetMode)clientResetMode {
+    return [self immediatelyOpenRealmForPartitionValue:partitionValue
+                                                  user:user
+                                       clientResetMode:clientResetMode
                                          encryptionKey:nil
                                             stopPolicy:RLMSyncStopPolicyAfterChangesUploaded];
 }
@@ -243,7 +268,19 @@ static NSURL *syncDirectoryForChildProcess() {
                                                user:(RLMUser *)user
                                       encryptionKey:(NSData *)encryptionKey
                                          stopPolicy:(RLMSyncStopPolicy)stopPolicy {
-    auto c = [user configurationWithPartitionValue:partitionValue];
+    return [self immediatelyOpenRealmForPartitionValue:partitionValue
+                                                  user:user
+                                       clientResetMode:RLMClientResetModeRecoverUnsyncedChanges
+                                         encryptionKey:encryptionKey
+                                            stopPolicy:RLMSyncStopPolicyAfterChangesUploaded];
+}
+
+- (RLMRealm *)immediatelyOpenRealmForPartitionValue:(NSString *)partitionValue
+                                               user:(RLMUser *)user
+                                    clientResetMode:(RLMClientResetMode)clientResetMode
+                                      encryptionKey:(NSData *)encryptionKey
+                                         stopPolicy:(RLMSyncStopPolicy)stopPolicy {
+    auto c = [user configurationWithPartitionValue:partitionValue clientResetMode:clientResetMode];
     c.encryptionKey = encryptionKey;
     c.objectClasses = @[Dog.self, Person.self, HugeSyncObject.self, RLMSetSyncObject.self,
                         RLMArraySyncObject.self, UUIDPrimaryKeyObject.self, StringPrimaryKeyObject.self,
@@ -287,7 +324,7 @@ static NSURL *syncDirectoryForChildProcess() {
     NSDictionary *payload = @{
         @"aud": appId,
         @"sub": @"someUserId",
-        @"exp": @1661896476,
+        @"exp": @1961896476,
         @"user_data": @{
             @"name": @"Foo Bar",
             @"occupation": @"firefighter"
@@ -627,7 +664,7 @@ static NSURL *syncDirectoryForChildProcess() {
         }
         else {
             NSError *error;
-            _flexibleSyncAppId = [RealmServer.shared createAppWithQueryableFields:@[@"age", @"breed", @"partition", @"firstName", @"boolCol", @"intCol", @"stringCol", @"dateCol", @"lastName"] error:&error];
+            _flexibleSyncAppId = [RealmServer.shared createAppWithQueryableFields:@[@"age", @"breed", @"partition", @"firstName", @"boolCol", @"intCol", @"stringCol", @"dateCol", @"lastName", @"_id"] error:&error];
             if (error) {
                 NSLog(@"Failed to create app: %@", error);
                 abort();

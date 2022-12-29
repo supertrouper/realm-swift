@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#import <Realm/RLMConstants.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +30,7 @@ typedef NS_ENUM(NSUInteger, RLMUpdatePolicy) {
     RLMUpdatePolicyUpdateAll = 2,
 };
 
-NS_ASSUME_NONNULL_BEGIN
+RLM_HEADER_AUDIT_BEGIN(nullability)
 
 void RLMVerifyHasPrimaryKey(Class cls);
 
@@ -60,6 +60,9 @@ id _Nullable RLMGetObject(RLMRealm *realm, NSString *objectClassName, id _Nullab
 RLMObjectBase *RLMCreateObjectInRealmWithValue(RLMRealm *realm, NSString *className,
                                                id _Nullable value, RLMUpdatePolicy updatePolicy)
 NS_RETURNS_RETAINED;
+
+// creates an asymmetric object and doesn't return
+void RLMCreateAsymmetricObjectInRealm(RLMRealm *realm, NSString *className, id value);
 
 //
 // Accessor Creation
@@ -92,4 +95,4 @@ RLMObjectBase *RLMCreateObjectAccessor(RLMClassInfo& info, int64_t key) NS_RETUR
 RLMObjectBase *RLMCreateObjectAccessor(RLMClassInfo& info, realm::Obj&& obj) NS_RETURNS_RETAINED;
 #endif
 
-NS_ASSUME_NONNULL_END
+RLM_HEADER_AUDIT_END(nullability)

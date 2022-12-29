@@ -19,7 +19,7 @@
 #import <Foundation/Foundation.h>
 #import <Realm/RLMObjectId.h>
 
-NS_ASSUME_NONNULL_BEGIN
+RLM_HEADER_AUDIT_BEGIN(nullability, sendability)
 
 /// UserAPIKey model for APIKeys recevied from the server.
 @interface RLMUserAPIKey : NSObject
@@ -34,9 +34,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// the response when an API key is first created.
 @property (nonatomic, readonly, nullable) NSString *key;
 
-/// The ObjectId of the user
-@property (nonatomic, readonly) RLMObjectId *objectId;
+/// The ObjectId of the API key
+@property (nonatomic, readonly) RLMObjectId *objectId NS_REFINED_FOR_SWIFT;
 
 @end
 
-NS_ASSUME_NONNULL_END
+RLM_HEADER_AUDIT_END(nullability, sendability)

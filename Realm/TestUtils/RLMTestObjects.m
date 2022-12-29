@@ -25,6 +25,11 @@
 #pragma mark OneTypeObjects
 
 @implementation StringObject
+
+- (NSString *)firstLetter {
+    return [self.stringCol substringToIndex:1];
+}
+
 @end
 
 @implementation IntObject
@@ -445,6 +450,13 @@
 
 @end
 
+@implementation RenamedProperties
++ (NSDictionary *)_realmColumnNames {
+    return @{@"intCol": @"custom_intCol",
+             @"stringCol": @"custom_stringCol"};
+}
+@end
+
 @implementation RenamedProperties1
 + (NSString *)_realmObjectName {
     return @"Renamed Properties";
@@ -470,6 +482,12 @@
 + (NSDictionary *)linkingObjectsProperties {
     return @{@"linking1": [RLMPropertyDescriptor descriptorWithClass:LinkToRenamedProperties1.class propertyName:@"linkA"],
              @"linking2": [RLMPropertyDescriptor descriptorWithClass:LinkToRenamedProperties2.class propertyName:@"linkD"]};
+}
+@end
+
+@implementation LinkToRenamedProperties
++ (NSDictionary *)_realmColumnNames {
+    return @{@"link": @"Link"};
 }
 @end
 

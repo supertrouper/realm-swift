@@ -152,7 +152,7 @@ static bool rawTypeShouldBeTreatedAsComputedProperty(NSString *rawType) {
     _setterSel = NSSelectorFromString(_setterName);
 }
 
-static realm::util::Optional<RLMPropertyType> typeFromProtocolString(const char *type) {
+static std::optional<RLMPropertyType> typeFromProtocolString(const char *type) {
     if (strcmp(type, "RLMValue>\"") == 0) {
         return RLMPropertyTypeAny;
     }
@@ -698,6 +698,7 @@ static realm::util::Optional<RLMPropertyType> typeFromProtocolString(const char 
             @"%@ {\n"
              "\ttype = %@;\n"
              "%@"
+             "\tcolumnName = %@;\n"
              "\tindexed = %@;\n"
              "\tisPrimary = %@;\n"
              "\tarray = %@;\n"
@@ -707,6 +708,7 @@ static realm::util::Optional<RLMPropertyType> typeFromProtocolString(const char 
              "}",
             self.name, RLMTypeToString(self.type),
             objectClassName,
+            self.columnName,
             self.indexed ? @"YES" : @"NO",
             self.isPrimary ? @"YES" : @"NO",
             self.array ? @"YES" : @"NO",
@@ -722,6 +724,9 @@ static realm::util::Optional<RLMPropertyType> typeFromProtocolString(const char 
 - (realm::Property)objectStoreCopy:(RLMSchema *)schema {
     realm::Property p;
     p.name = self.columnName.UTF8String;
+    if (_columnName) {
+        p.public_name = _name.UTF8String;
+    }
     if (_objectClassName) {
         RLMObjectSchema *targetSchema = schema[_objectClassName];
         p.object_type = (targetSchema.objectName ?: _objectClassName).UTF8String;

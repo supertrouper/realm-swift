@@ -42,22 +42,24 @@ using namespace realm;
 namespace {
 using ProtocolError = realm::sync::ProtocolError;
 
-RLMSyncSystemErrorKind errorKindForSyncError(SyncError error) {
-    if (error.is_client_reset_requested()) {
-        return RLMSyncSystemErrorKindClientReset;
-    } else if (error.error_code == ProtocolError::permission_denied) {
-        return RLMSyncSystemErrorKindPermissionDenied;
-    } else if (error.error_code == ProtocolError::bad_authentication) {
-        return RLMSyncSystemErrorKindUser;
-    } else if (error.is_session_level_protocol_error()) {
-        return RLMSyncSystemErrorKindSession;
-    } else if (error.is_connection_level_protocol_error()) {
-        return RLMSyncSystemErrorKindConnection;
-    } else if (error.is_client_error()) {
-        return RLMSyncSystemErrorKindClient;
-    } else {
-        return RLMSyncSystemErrorKindUnknown;
+RLMSyncError errorKindForSyncError(SyncError error) {
+    if (error.is_client_reset_requested())
+        return RLMSyncErrorClientResetError;
+    if (error.error_code.category() == realm::sync::protocol_error_category()) {
+        switch (static_cast<ProtocolError>(error.error_code.value())) {
+            case ProtocolError::permission_denied:
+                return RLMSyncErrorPermissionDeniedError;
+            case ProtocolError::bad_authentication:
+                return RLMSyncErrorClientUserError;
+            case ProtocolError::compensating_write:
+                return RLMSyncErrorWriteRejected;
+            default:
+                break;
+        }
     }
+    if (error.is_session_level_protocol_error())
+        return RLMSyncErrorClientSessionError;
+    return RLMSyncErrorClientInternalError;
 }
 
 struct CallbackSchema {
@@ -105,6 +107,7 @@ struct AfterClientResetWrapper : CallbackSchema {
 
 @interface RLMSyncConfiguration () {
     std::unique_ptr<realm::SyncConfig> _config;
+    RLMSyncErrorReportingBlock _manualClientResetHandler;
 }
 
 @end
@@ -169,7 +172,7 @@ struct AfterClientResetWrapper : CallbackSchema {
     if (!beforeClientReset) {
         _config->notify_before_client_reset = nullptr;
     } else if (self.clientResetMode == RLMClientResetModeManual) {
-        @throw RLMException(@"Client reset notifications not supported in Manual mode. Use SyncManager.ErrorHandler");
+        @throw RLMException(@"RLMClientResetBeforeBlock reset notifications are not supported in Manual mode. Use RLMSyncConfiguration.manualClientResetHandler or RLMSyncManager.ErrorHandler");
     } else {
         _config->notify_before_client_reset = BeforeClientResetWrapper{.block = beforeClientReset};
     }
@@ -188,10 +191,25 @@ struct AfterClientResetWrapper : CallbackSchema {
     if (!afterClientReset) {
         _config->notify_after_client_reset = nullptr;
     } else if (self.clientResetMode == RLMClientResetModeManual) {
-        @throw RLMException(@"Client reset notifications not supported in Manual mode. Use SyncManager.ErrorHandler");
+        @throw RLMException(@"RLMClientResetAfterBlock reset notifications are not supported in Manual mode. Use RLMSyncConfiguration.manualClientResetHandler or RLMSyncManager.ErrorHandler");
     } else {
         _config->notify_after_client_reset = AfterClientResetWrapper{.block = afterClientReset};
     }
+}
+
+- (RLMSyncErrorReportingBlock)manualClientResetHandler {
+    return _manualClientResetHandler;
+}
+
+- (void)setManualClientResetHandler:(RLMSyncErrorReportingBlock)manualClientReset {
+    if (!manualClientReset) {
+        _manualClientResetHandler = nil;
+    } else if (self.clientResetMode != RLMClientResetModeManual) {
+        @throw RLMException(@"A manual client reset handler can only be set with RLMClientResetModeManual");
+    } else {
+        _manualClientResetHandler = manualClientReset;
+    }
+    [self assignConfigErrorHandler:self.user];
 }
 
 void RLMSetConfigInfoForClientResetCallbacks(realm::SyncConfig& syncConfig, RLMRealmConfiguration *config) {
@@ -229,57 +247,59 @@ void RLMSetConfigInfoForClientResetCallbacks(realm::SyncConfig& syncConfig, RLMR
 }
 
 NSError *RLMTranslateSyncError(SyncError error) {
-    NSString *recoveryPath;
-    RLMSyncErrorActionToken *token;
+    NSMutableDictionary *userInfo = [NSMutableDictionary new];
+
     for (auto& pair : error.user_info) {
         if (pair.first == realm::SyncError::c_original_file_path_key) {
-            token = [[RLMSyncErrorActionToken alloc] initWithOriginalPath:pair.second];
+            userInfo[kRLMSyncErrorActionTokenKey] =
+                [[RLMSyncErrorActionToken alloc] initWithOriginalPath:pair.second];
         }
         else if (pair.first == realm::SyncError::c_recovery_file_path_key) {
-            recoveryPath = @(pair.second.c_str());
+            userInfo[kRLMSyncPathOfRealmBackupCopyKey] = @(pair.second.c_str());
         }
     }
 
-    NSDictionary *custom;
     // Note that certain types of errors are 'interactive'; users have several options
     // as to how to proceed after the error is reported.
-    auto errorClass = errorKindForSyncError(error);
-    switch (errorClass) {
-        case RLMSyncSystemErrorKindClientReset: {
-            custom = @{kRLMSyncPathOfRealmBackupCopyKey: recoveryPath, kRLMSyncErrorActionTokenKey: token};
+    auto errorCode = errorKindForSyncError(error);
+    switch (errorCode) {
+        case RLMSyncErrorClientResetError:
+        case RLMSyncErrorPermissionDeniedError:
+        case RLMSyncErrorUnderlyingAuthError:
+        case RLMSyncErrorWriteRejected:
             break;
-        }
-        case RLMSyncSystemErrorKindPermissionDenied: {
-            if (token) {
-                custom = @{kRLMSyncErrorActionTokenKey: token};
-            }
-            break;
-        }
-        case RLMSyncSystemErrorKindUser:
-        case RLMSyncSystemErrorKindSession:
-            break;
-        case RLMSyncSystemErrorKindConnection:
-        case RLMSyncSystemErrorKindClient:
-        case RLMSyncSystemErrorKindUnknown:
+        case RLMSyncErrorClientSessionError:
+        case RLMSyncErrorClientUserError:
+        case RLMSyncErrorClientInternalError:
             if (!error.is_fatal) {
                 return nil;
             }
             break;
     }
+    userInfo[NSLocalizedDescriptionKey] = RLMStringViewToNSString(error.simple_message);
+    userInfo[kRLMSyncErrorStatusCodeKey] = @(error.error_code.value());
+    if (!error.logURL.empty()) {
+        userInfo[RLMServerLogURLKey] = RLMStringViewToNSString(error.logURL);
+    }
 
-    return make_sync_error(errorClass, @(error.message.c_str()), error.error_code.value(), custom);
+    return [NSError errorWithDomain:RLMSyncErrorDomain
+                               code:errorCode
+                           userInfo:[userInfo copy]];
 }
 
-static void setDefaults(SyncConfig& config, RLMUser *user) {
-    config.client_resync_mode = ClientResyncMode::Manual;
-    config.stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
-
+- (void)assignConfigErrorHandler:(RLMUser *)user {
     RLMSyncManager *manager = [user.app syncManager];
     __weak RLMSyncManager *weakManager = manager;
-    config.error_handler = [weakManager](std::shared_ptr<SyncSession> errored_session, SyncError error) {
+    RLMSyncErrorReportingBlock resetHandler = self.manualClientResetHandler;
+    _config->error_handler = [weakManager, resetHandler](std::shared_ptr<SyncSession> errored_session, SyncError error) {
         RLMSyncErrorReportingBlock errorHandler;
-        @autoreleasepool {
-            errorHandler = weakManager.errorHandler;
+        if (error.is_client_reset_requested()) {
+            errorHandler = resetHandler;
+        }
+        if (!errorHandler) {
+            @autoreleasepool {
+                errorHandler = weakManager.errorHandler;
+            }
         }
         if (!errorHandler) {
             return;
@@ -296,6 +316,13 @@ static void setDefaults(SyncConfig& config, RLMUser *user) {
             errorHandler(nsError, session);
         });
     };
+};
+
+static void setDefaults(SyncConfig& config, RLMUser *user) {
+    config.client_resync_mode = ClientResyncMode::Recover;
+    config.stop_policy = SyncSessionStopPolicy::AfterChangesUploaded;
+
+    RLMSyncManager *manager = [user.app syncManager];
 
     if (NSString *authorizationHeaderName = manager.authorizationHeaderName) {
         config.authorization_header_name.emplace(authorizationHeaderName.UTF8String);
@@ -315,6 +342,7 @@ static void setDefaults(SyncConfig& config, RLMUser *user) {
         _config = std::make_unique<SyncConfig>([user _syncUser], s.str());
         _path = [user pathForPartitionValue:_config->partition_value];
         setDefaults(*_config, user);
+        [self assignConfigErrorHandler:user];
     }
     return self;
 }
@@ -324,6 +352,7 @@ static void setDefaults(SyncConfig& config, RLMUser *user) {
         _config = std::make_unique<SyncConfig>([user _syncUser], SyncConfig::FLXSyncEnabled{});
         _path = [user pathForFlexibleSync];
         setDefaults(*_config, user);
+        [self assignConfigErrorHandler:user];
     }
     return self;
 }

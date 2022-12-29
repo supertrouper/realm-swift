@@ -216,6 +216,7 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
         case realm::sync::SubscriptionSet::State::Uncommitted:
         case realm::sync::SubscriptionSet::State::Pending:
         case realm::sync::SubscriptionSet::State::Bootstrapping:
+        case realm::sync::SubscriptionSet::State::AwaitingMark:
             return RLMSyncSubscriptionStatePending;
         case realm::sync::SubscriptionSet::State::Complete:
             return RLMSyncSubscriptionStateComplete;
@@ -253,22 +254,19 @@ NSUInteger RLMFastEnumerate(NSFastEnumerationState *state,
 - (void)waitForSynchronizationOnQueue:(nullable dispatch_queue_t)queue
                       completionBlock:(void(^)(NSError *))completionBlock {
     _subscriptionSet->get_state_change_notification(realm::sync::SubscriptionSet::State::Complete)
-        .get_async([completionBlock, queue](realm::StatusWith<realm::sync::SubscriptionSet::State> state) mutable noexcept {
-            void (^block)(void) = ^{
-                if (state.is_ok()) {
-                    completionBlock(nil);
-                } else {
-                    NSError* error = [[NSError alloc] initWithDomain:RLMFlexibleSyncErrorDomain code:state.get_status().code() userInfo:@{@"reason": @(state.get_status().reason().c_str())}];
-                    completionBlock(error);
-                }
-            };
-
+        .get_async([completionBlock, queue](realm::StatusWith<realm::sync::SubscriptionSet::State> state) noexcept {
+            NSError *error;
+            if (!state.is_ok()) {
+                error = [[NSError alloc] initWithDomain:RLMErrorDomain
+                                                   code:RLMErrorSubscriptionFailed
+                                               userInfo:@{NSLocalizedDescriptionKey: @(state.get_status().reason().c_str())}];
+            }
             if (queue) {
                 dispatch_async(queue, ^{
-                    block();
+                    completionBlock(error);
                 });
             } else {
-                block();
+                completionBlock(error);
             }
         });
 }

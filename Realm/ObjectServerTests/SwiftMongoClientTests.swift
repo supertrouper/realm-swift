@@ -43,17 +43,6 @@ class SwiftMongoClientTests: SwiftSyncTestCase {
         XCTAssertEqual(collection.name, "Dog")
     }
 
-    func removeAllFromCollection(_ collection: MongoCollection) {
-        let deleteEx = expectation(description: "Delete all from Mongo collection")
-        collection.deleteManyDocuments(filter: [:]) { result in
-            if case .failure = result {
-                XCTFail("Should delete")
-            }
-            deleteEx.fulfill()
-        }
-        wait(for: [deleteEx], timeout: 20.0)
-    }
-
     func setupMongoCollection() -> MongoCollection {
         let user = try! logInUser(for: basicCredentials())
         let mongoClient = user.mongoClient("mongodb1")
@@ -402,7 +391,7 @@ class SwiftMongoClientTests: SwiftSyncTestCase {
             case .success(let updateResult):
                 XCTAssertEqual(updateResult.matchedCount, 1)
                 XCTAssertEqual(updateResult.modifiedCount, 1)
-                XCTAssertNil(updateResult.objectId)
+                XCTAssertNil(updateResult.documentId)
             case .failure:
                 XCTFail("Should update")
             }
@@ -416,7 +405,7 @@ class SwiftMongoClientTests: SwiftSyncTestCase {
             case .success(let updateResult):
                 XCTAssertEqual(updateResult.matchedCount, 0)
                 XCTAssertEqual(updateResult.modifiedCount, 0)
-                XCTAssertNotNil(updateResult.objectId)
+                XCTAssertNotNil(updateResult.documentId)
             case .failure:
                 XCTFail("Should update")
             }
@@ -451,7 +440,7 @@ class SwiftMongoClientTests: SwiftSyncTestCase {
             case .success(let updateResult):
                 XCTAssertEqual(updateResult.matchedCount, 1)
                 XCTAssertEqual(updateResult.modifiedCount, 1)
-                XCTAssertNil(updateResult.objectId)
+                XCTAssertNil(updateResult.documentId)
             case .failure:
                 XCTFail("Should update")
             }
@@ -465,7 +454,7 @@ class SwiftMongoClientTests: SwiftSyncTestCase {
             case .success(let updateResult):
                 XCTAssertEqual(updateResult.matchedCount, 0)
                 XCTAssertEqual(updateResult.modifiedCount, 0)
-                XCTAssertNotNil(updateResult.objectId)
+                XCTAssertNotNil(updateResult.documentId)
             case .failure:
                 XCTFail("Should update")
             }
@@ -1076,14 +1065,14 @@ class AsyncAwaitMongoClientTests: SwiftSyncTestCase {
 
         let updatedResult = try await collection.updateOneDocument(filter: document,
                                                                    update: document2)
-        XCTAssertNil(updatedResult.objectId)
+        XCTAssertNil(updatedResult.documentId)
         XCTAssertEqual(updatedResult.matchedCount, 1)
         XCTAssertEqual(updatedResult.modifiedCount, 1)
 
         let updatedResult1 = try await collection.updateOneDocument(filter: document,
                                                                     update: document2,
                                                                     upsert: true)
-        XCTAssertNotNil(updatedResult1.objectId)
+        XCTAssertNotNil(updatedResult1.documentId)
         XCTAssertEqual(updatedResult1.matchedCount, 0)
         XCTAssertEqual(updatedResult1.modifiedCount, 0)
     }
@@ -1101,14 +1090,14 @@ class AsyncAwaitMongoClientTests: SwiftSyncTestCase {
 
         let updatedResult = try await collection.updateManyDocuments(filter: document,
                                                                      update: document2)
-        XCTAssertNil(updatedResult.objectId)
+        XCTAssertNil(updatedResult.documentId)
         XCTAssertEqual(updatedResult.matchedCount, 1)
         XCTAssertEqual(updatedResult.modifiedCount, 1)
 
         let updatedResult2 = try await collection.updateManyDocuments(filter: document,
                                                                       update: document2,
                                                                       upsert: true)
-        XCTAssertNotNil(updatedResult2.objectId)
+        XCTAssertNotNil(updatedResult2.documentId)
         XCTAssertEqual(updatedResult2.matchedCount, 0)
         XCTAssertEqual(updatedResult2.modifiedCount, 0)
     }
